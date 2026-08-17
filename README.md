@@ -49,7 +49,14 @@ Bash
 python src/extract.py
 Os arquivos CSV resultantes serão salvos automaticamente na pasta data/.
 
-🛤️ Próximos Passos
-[ ] Transformação: Criar o script para unificar os 5 anos de dados, traduzir os códigos numéricos (CID-10, Escolaridade, etc.) utilizando dicionários oficiais e tratar dados nulos.
+---
+
+## 🔄 Fase 2: Transformação de Dados (Transform)
+
+O script `src/transform.py` é responsável por limpar, padronizar e unificar os dados brutos extraídos, preparando-os para a análise espacial e cruzamentos futuros. Suas principais funções são:
+- **Consolidação:** Unifica os arquivos anuais em uma única base de dados consolidada.
+- **Tradução de Variáveis (Dicionários de Dados):** Decodifica as numerações originais do DATASUS para formatos textuais analíticos legíveis (ex: Idade, Sexo, Raça/Cor e Escolaridade).
+- **Tratamento de CEPs:** Limpeza e padronização da formatação dos CEPs de residência para viabilizar o futuro georreferenciamento e cruzamento com indicadores do IBGE/CadÚnico.
+- **Otimização:** Filtra apenas as colunas de interesse para reduzir o peso do arquivo final.
 
 [ ] Análise Espacial: Obter os shapefiles de Campinas e cruzar os CEPs/Endereços com os polígonos dos bairros e setores censitários.
