@@ -1,0 +1,111 @@
+import os
+import pandas as pd
+
+# Tentativa de importação das duas APIs do PySUS para contingência
+try:
+    from pysus import sim as sim_new
+except ImportError:
+    sim_new = None
+
+try:
+    from pysus.online_data.SIM import download as sim_legacy
+    from pysus.online_data import parquets_to_dataframe
+except ImportError:
+    sim_legacy = None
+    parquets_to_dataframe = None
+
+def baixar_dados_sim_campinas(ano: int, estado: str = "SP"):
+    """
+    Baixa os microdados de mortalidade (SIM) para o estado e ano especificados.
+    Implementa dupla tentativa (S3 Catalog -> Direct FTP) para tolerância a falhas.
+    Filtra as ocorrências do município de Campinas (Código IBGE: 350950) e salva em CSV.
+    """
+    print(f"📥 [SIM] Iniciando extração do ano {ano} para o estado {estado}...")
+    
+    # Garante que a pasta 'data' existe na raiz do projeto
+    os.makedirs("data", exist_ok=True)
+    caminho_saida = f"data/sim_campinas_{ano}.csv"
+    
+    df_completo = None
+
+    # --- TENTATIVA 1: API Nova (S3 / DuckLake Catalog) ---
+    if sim_new is not None:
+        try:
+            print("   -> Tentando obter dados pelo Catálogo S3 (API Nova)...")
+            dados = sim_new(state=estado, year=ano)
+            
+            if isinstance(dados, list) and len(dados) > 0:
+                print(f"   -> Sucesso! Unificando {len(dados)} arquivo(s) Parquet do catálogo S3...")
+                dfs = [pd.read_parquet(filepath) for filepath in dados]
+                df_completo = pd.concat(dfs, ignore_index=True)
+            elif isinstance(dados, pd.DataFrame) and not dados.empty:
+                df_completo = dados
+                print("   -> Sucesso! Dados retornados diretamente em DataFrame...")
+            else:
+                print("   ⚠️ O catálogo S3 retornou uma lista de arquivos vazia.")
+        except Exception as e:
+            print(f"   ⚠️ Falha técnica na tentativa pelo Catálogo S3: {e}")
+
+    # --- TENTATIVA 2: API Legada (FTP Direto do DATASUS) ---
+    if df_completo is None:
+        if sim_legacy is not None:
+            try:
+                print("   -> Alternando para download direto via FTP do DATASUS (API de Contingência)...")
+                arquivos_baixados = sim_legacy(estado, ano)
+                
+                if arquivos_baixados:
+                    print("   -> Sucesso no FTP! Convertendo arquivos brutos para DataFrame...")
+                    if parquets_to_dataframe is not None:
+                        df_completo = parquets_to_dataframe(arquivos_baixados)
+                    else:
+                        if isinstance(arquivos_baixados, list):
+                            dfs = [pd.read_parquet(fp) for fp in arquivos_baixados]
+                            df_completo = pd.concat(dfs, ignore_index=True)
+                        else:
+                            df_completo = pd.read_parquet(arquivos_baixados)
+                else:
+                    print("   ⚠️ O download via FTP direto retornou vazio.")
+            except Exception as e:
+                print(f"   ❌ Falha crítica ao baixar diretamente do FTP do DATASUS: {e}")
+                print("      (Nota: O servidor FTP do DATASUS é instável e costuma rejeitar conexões sob alta carga.)")
+        else:
+            print("   ❌ Módulo de download FTP legado não disponível no ambiente Python.")
+
+    # --- PROCESSAMENTO DOS DADOS ADQUIRIDOS ---
+    if df_completo is not None and not df_completo.empty:
+        print(f"   ✓ Total de registros carregados para o estado (SP): {len(df_completo)}")
+        
+        # Identificador do município de residência (CODMUNRES) ou ocorrência (CODMUNOCOR)
+        coluna_municipio = 'CODMUNRES' if 'CODMUNRES' in df_completo.columns else 'CODMUNOCOR'
+        
+        if coluna_municipio in df_completo.columns:
+            # Converte para string para garantir a filtragem exata por código de 6 dígitos
+            df_completo[coluna_municipio] = df_completo[coluna_municipio].astype(str).str.strip()
+            
+            # Código IBGE de Campinas: 350950
+            df_campinas = df_completo[df_completo[coluna_municipio].str.startswith('350950')]
+            print(f"   ✓ Registros filtrados exclusivamente para Campinas ({coluna_municipio}): {len(df_campinas)}")
+        else:
+            print("   ⚠️ Campo municipal de localização não identificado. Salvando base completa.")
+            df_campinas = df_completo
+            
+        # Gravação local
+        df_campinas.to_csv(caminho_saida, index=False, encoding='utf-8')
+        print(f"💾 Arquivo salvo com sucesso em: {caminho_saida}\n")
+    else:
+        print(f"❌ Não foi possível consolidar a base para o ano {ano}.\n")
+
+if __name__ == "__main__":
+    # Recorte temporal: 2020 a 2024
+    anos_coleta = list(range(2020, 2025))
+    
+    print("🚀 === INICIANDO PIPELINE DE EXTRAÇÃO RESILIENTE (DATASUS - SIM) ===")
+    for ano in anos_coleta:
+        # Se o arquivo já existe localmente, evita rebaixar para poupar rede e evitar erros de conexão
+        caminho_arquivo = f"data/sim_campinas_{ano}.csv"
+        if os.path.exists(caminho_arquivo):
+            print(f"📦 Arquivo já existente em cache local: {caminho_arquivo}. Pulando download.\n")
+            continue
+            
+        baixar_dados_sim_campinas(ano=ano)
+    print("🎉 === PROCESSO DE EXTRAÇÃO CONCLUÍDO ===")
