@@ -6,57 +6,55 @@ Projeto acadêmico focado no desenvolvimento de um pipeline de dados (ETL) para 
 
 ## 🏗️ Arquitetura do Projeto
 
-O repositório está organizado de forma modular para separar os processos de extração, transformação e carga/análise espacial:
+O repositório está organizado de forma modular para separar os processos de extração, tratamento e análise espacial:
 
 ```text
 tcc-datasus/
-├── data/                  # 📁 Diretório local ignorado pelo Git (armazena os CSVs pesados)
-├── notebooks/             # 📓 Jupyter Notebooks para análises exploratórias (EDA)
-├── src/                   # 💻 Códigos-fonte do pipeline de ETL
-│   ├── extract.py         # 📥 Script de coleta do DATASUS via FTP (Resiliente e Baixo Consumo de Memória)
-│   ├── transform.py       # 🔄 Script de limpeza e unificação de dados (Em desenvolvimento)
-│   ├── spatial.py         # 🗺️ Script de junção espacial via GeoPandas (Em breve)
-│   └── database.py        # 🗄️ Script de conexão com o banco MySQL (Em breve)
-├── .gitignore             # 🚫 Regras para não subir arquivos pesados para o GitHub
+├── SIM/                   # 📁 Módulo de Mortalidade (Óbitos)
+│   ├── data/              # 📁 Dados brutos e processados do SIM
+│   ├── notebooks/         # 📓 Análises exploratórias de mortalidade (Ano, Sexo, Idade, Raça)
+│   └── src/               # 💻 Scripts de ETL do SIM
+├── SIH/                   # 📁 Módulo de Internações Hospitalares
+│   ├── data/              # 📁 Dados brutos e processados do SIH
+│   ├── notebooks/         # 📓 Análises de internações, CEPs e causas (CID-10)
+│   └── src/               # 💻 Scripts de extração do SIH
+├── .gitignore             # 🚫 Regras para ignorar arquivos pesados (CSV/DBC)
 ├── requirements.txt       # 📦 Dependências do projeto (Bibliotecas Python)
 └── README.md              # 📖 Documentação do projeto
 
 🚀 Status Atual do Desenvolvimento
-Atualmente, concluímos a Fase 1: Extração de Dados (Extract).
+1️⃣ Fase de Extração (Extract) — Concluída
+SIM (Mortalidade): Coleta automatizada via FTP dos últimos 5 anos de óbitos em Campinas (2020–2024), com preservação de todas as 87 colunas originais do DATASUS.
 
-O script src/extract.py foi construído para lidar de forma autônoma e resiliente com o Sistema de Informações sobre Mortalidade (SIM) do DATASUS. Suas principais características incluem:
+SIH (Internações): Pipeline mensal implementado para extração de microdados de internação (RD), filtrando de forma otimizada (linha por linha) apenas os registros de moradores de Campinas (código IBGE 350950).
 
-Download Direto (FTP): Conecta diretamente aos servidores governamentais para baixar os microdados brutos (.dbc).
+2️⃣ Fase de Análise Exploratória (EDA) — Em Andamento
+Mortalidade: Cruzamentos populacionais por Ano, Faixa Etária, Sexo e Raça/Cor das principais causas de óbito (com destaque para o impacto da COVID-19, infartos e Alzheimer).
 
-Descompactação Nativa: Utiliza pyreaddbc para transformar os dados em um formato legível localmente.
+Internações: Validação do preenchimento de CEPs (100% de cobertura na base de 2023) e mapeamento preliminar por regiões e causas principais de internação hospitalar via CID-10.
 
-Leitura em Streaming (Linha por Linha): Lê o banco de dados estadual linha por linha utilizando dbfread, filtrando apenas os registros de Campinas (código IBGE 350950) antes de gerar o DataFrame do Pandas. Isso impede o esgotamento da memória (RAM) em ambientes de nuvem.
-
-Série Histórica: Coleta automatizada dos últimos 5 anos de dados consolidados (2020 a 2024).
-
-💻 Como Executar a Extração
-Certifique-se de estar com o ambiente virtual ativado:
+💻 Como Executar o Projeto
+Certifique-se de estar com o ambiente virtual ativado e as dependências instaladas:
 
 Bash
+# Ativa o ambiente virtual
 source .venv/bin/activate
-Instale as dependências (caso seja a primeira execução):
 
-Bash
+# Instala as bibliotecas necessárias
 pip install -r requirements.txt
-Rode o script de extração:
+Para rodar a extração dos dados brutos do DATASUS:
 
 Bash
-python src/extract.py
-Os arquivos CSV resultantes serão salvos automaticamente na pasta data/.
+# Extração do SIM (Óbitos)
+cd SIM/src && python extract.py
+
+# Extração do SIH (Internações)
+cd SIH/src && python extract.py
 
 ---
 
-## 🔄 Fase 2: Transformação de Dados (Transform)
-
-O script `src/transform.py` é responsável por limpar, padronizar e unificar os dados brutos extraídos, preparando-os para a análise espacial e cruzamentos futuros. Suas principais funções são:
-- **Consolidação:** Unifica os arquivos anuais em uma única base de dados consolidada.
-- **Tradução de Variáveis (Dicionários de Dados):** Decodifica as numerações originais do DATASUS para formatos textuais analíticos legíveis (ex: Idade, Sexo, Raça/Cor e Escolaridade).
-- **Tratamento de CEPs:** Limpeza e padronização da formatação dos CEPs de residência para viabilizar o futuro georreferenciamento e cruzamento com indicadores do IBGE/CadÚnico.
-- **Otimização:** Filtra apenas as colunas de interesse para reduzir o peso do arquivo final.
-
-[ ] Análise Espacial: Obter os shapefiles de Campinas e cruzar os CEPs/Endereços com os polígonos dos bairros e setores censitários.
+Após colar e salvar o arquivo, basta fazer o último commit e push rápido para atualizar a página principal do GitHub:
+```bash
+git add README.md
+git commit -m "docs: atualiza o README com a estrutura do SIH e status atual"
+git push
