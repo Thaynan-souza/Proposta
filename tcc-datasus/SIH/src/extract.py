@@ -68,9 +68,7 @@ def baixar_dados_sih_campinas(ano: int, estado: str = "SP"):
         print(f"❌ Nenhum dado encontrado para {ano}.\n")
 
 if __name__ == "__main__":
-    # Vamos testar APENAS com 2023 primeiro para ver se a conexão está rápida.
-    # O SIH é bem mais pesado que o SIM. Depois adicionamos os outros anos.
-    anos_coleta = [2023] 
+    anos_coleta = [2020, 2021, 2022, 2024, 2025] 
     print("🚀 === INICIANDO PIPELINE DE EXTRAÇÃO (SIH) === ")
     for ano in anos_coleta:
         baixar_dados_sih_campinas(ano=ano)
