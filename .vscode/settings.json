@@ -1,0 +1,11 @@
+{
+    "sqltools.connections": [
+        {
+            "previewLimit": 50,
+            "driver": "SQLite",
+            "name": "TCC_analise_dados",
+            "database": "${workspaceFolder:Proposta}/Socioeconomico/Censo2010/data/processed/banco_tcc.db"
+        }
+    ],
+    "sqltools.useNodeRuntime": true
+}
