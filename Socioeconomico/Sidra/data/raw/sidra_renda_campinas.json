@@ -1,0 +1,27 @@
+[
+    {
+        "id": "37",
+        "variavel": "Produto Interno Bruto a preços correntes",
+        "unidade": "Mil Reais",
+        "resultados": [
+            {
+                "classificacoes": [],
+                "series": [
+                    {
+                        "localidade": {
+                            "id": "3509502",
+                            "nivel": {
+                                "id": "N6",
+                                "nome": "Município"
+                            },
+                            "nome": "Campinas (SP)"
+                        },
+                        "serie": {
+                            "2021": "72946910"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+]
