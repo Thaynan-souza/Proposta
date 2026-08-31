@@ -1,75 +1,75 @@
 import os
 import pandas as pd
 import urllib.request
-from urllib.error import URLError
 import pyreaddbc
 from dbfread import DBF
 
-def baixar_dados_sih_campinas(ano: int, estado: str = "SP"):
-    print(f"📥 [SIH] Iniciando extração das internações de {ano} ({estado})...")
+def baixar_dados_sih_sp(ano: int, estado: str = "SP"):
+    print(f"📥 [SIH] Iniciando extração otimizada por lotes de {ano} ({estado})...")
 
-    pasta_raw = os.path.join("..", "data", "raw")
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    pasta_raw = os.path.join(base_dir, "..", "data", "raw")
     os.makedirs(pasta_raw, exist_ok=True)
-    arquivo_csv = os.path.join(pasta_raw, f"sih_campinas_{ano}.csv")
+    arquivo_csv = os.path.join(pasta_raw, f"sih_sp_{ano}.csv")
     
     if os.path.exists(arquivo_csv):
-        print(f"📦 Arquivo já existente em cache local: {arquivo_csv}. Pulando.\n")
-        return
+        os.remove(arquivo_csv)
 
-    # O SIH usa os 2 últimos dígitos do ano (ex: 2023 vira '23')
     ano_curto = str(ano)[-2:]
-    meses = [str(m).zfill(2) for m in range(1, 13)] # ['01', '02', ..., '12']
-    
-    lista_dfs_meses = []
+    meses = [str(m).zfill(2) for m in range(1, 13)] 
+    total_registros = 0
     
     for mes in meses:
-        # Padrão de arquivo: RD (Resumo de Internação) + UF + Ano + Mês
         arquivo_dbc = f"RD{estado}{ano_curto}{mes}.dbc"
         caminho_local_dbc = os.path.join(pasta_raw, arquivo_dbc)
         caminho_local_dbf = caminho_local_dbc.replace('.dbc', '.dbf')
-        
-        # Caminho oficial do FTP do DATASUS para o SIH
         url = f"ftp://ftp.datasus.gov.br/dissemin/publicos/SIHSUS/200801_/Dados/{arquivo_dbc}"
         
         try:
-            print(f"   -> Baixando {mes}/{ano}... ", end="")
+            print(f"   -> Baixando e processando {mes}/{ano}... ", end="", flush=True)
             urllib.request.urlretrieve(url, caminho_local_dbc)
             
-            # Descompacta e lê linha por linha para economizar memória
             pyreaddbc.dbc2dbf(caminho_local_dbc, caminho_local_dbf)
             table = DBF(caminho_local_dbf, encoding='iso-8859-1')
             
-            registros_campinas = []
-            for linha in table:
-                # MUNIC_RES = Município de Residência. 350950 = Campinas
-                mun_res = str(linha.get('MUNIC_RES', '')).strip()
-                if mun_res.startswith('350950'):
-                    registros_campinas.append(linha)
+            # Lendo em lotes (chunks) de 50 mil registros para poupar a RAM do Codespaces
+            lote = []
+            registros_mes = 0
+            escrever_cabecalho = (total_registros == 0)
             
-            if registros_campinas:
-                lista_dfs_meses.append(pd.DataFrame(registros_campinas))
-                print(f"✅ {len(registros_campinas)} registros.")
-            else:
-                print("✅ 0 registros.")
+            for registro in table:
+                lote.append(registro)
+                if len(lote) >= 50000:
+                    df_lote = pd.DataFrame(lote)
+                    df_lote.to_csv(arquivo_csv, mode='a', index=False, encoding='utf-8', header=escrever_cabecalho)
+                    escrever_cabecalho = False
+                    registros_mes += len(df_lote)
+                    total_registros += len(df_lote)
+                    lote = [] # Limpa a lista do lote da memória
+
+            # Salva o restante que sobrou (menos de 50 mil)
+            if lote:
+                df_lote = pd.DataFrame(lote)
+                df_lote.to_csv(arquivo_csv, mode='a', index=False, encoding='utf-8', header=escrever_cabecalho)
+                registros_mes += len(df_lote)
+                total_registros += len(df_lote)
+
+            print(f"✅ {registros_mes} registros.")
                 
         except Exception as e:
-            print(f"⚠️ Erro ao processar: {e}")
+            print(f"⚠️ Falha no mês {mes}/{ano}: {e}")
             
-        # Limpeza obrigatória para não estourar o disco do Codespaces
-        if os.path.exists(caminho_local_dbc): os.remove(caminho_local_dbc)
-        if os.path.exists(caminho_local_dbf): os.remove(caminho_local_dbf)
+        finally:
+            if os.path.exists(caminho_local_dbc): 
+                os.remove(caminho_local_dbc)
+            if os.path.exists(caminho_local_dbf): 
+                os.remove(caminho_local_dbf)
 
-    # Consolida os 12 meses do ano e salva no raw
-    if lista_dfs_meses:
-        df_ano = pd.concat(lista_dfs_meses, ignore_index=True)
-        df_ano.to_csv(arquivo_csv, index=False, encoding='utf-8')
-        print(f"💾 Arquivo anual salvo: {arquivo_csv} com {len(df_ano)} internações!\n")
-    else:
-        print(f"❌ Nenhum dado encontrado para {ano}.\n")
+    print(f"💾 Arquivo anual salvo: {arquivo_csv} com {total_registros} internações!\n")
 
 if __name__ == "__main__":
-    anos_coleta = [2020, 2021, 2022, 2024, 2025] 
-    print("🚀 === INICIANDO PIPELINE DE EXTRAÇÃO (SIH) === ")
+    anos_coleta = [2025] 
+    print("🚀 === INICIANDO PIPELINE DE EXTRAÇÃO (SIH - SP) === ")
     for ano in anos_coleta:
-        baixar_dados_sih_campinas(ano=ano)
+        baixar_dados_sih_sp(ano=ano)
     print("🎉 === PROCESSO CONCLUÍDO ===")

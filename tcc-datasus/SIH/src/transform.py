@@ -1,33 +1,12 @@
-import pandas as pd
-import requests
 import os
-import time
+import pandas as pd
 
-def buscar_bairro_unico(cep_limpo):
-    """Faz a requisição na API para um CEP já limpo e validado."""
-    if len(cep_limpo) != 8:
-        return "CEP Invalido"
-        
-    try:
-        url = f"https://viacep.com.br/ws/{cep_limpo}/json/"
-        response = requests.get(url, timeout=10)
-        
-        if response.status_code == 200:
-            dados = response.json()
-            if "erro" not in dados:
-                return dados.get('bairro', 'Bairro vazio na base')
-    except Exception:
-        pass # Ignora o erro no terminal para não poluir a tela
-        
-    return "Nao encontrado/Erro"
-
-def processar_sih():
+def processar_sih_por_partes():
+    print("🚀 Iniciando transformação em lotes da base SIH SP (2025)...")
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    input_path = os.path.join(base_dir, '../data/raw/sih_campinas_2025.csv')
-    output_path = os.path.join(base_dir, '../data/processed/sih_campinas_2025_processado.csv')
-
-    print("Carregando o arquivo original do SIH...")
-    df = pd.read_csv(input_path, sep=',', dtype={'CEP': str}, low_memory=False)
+    
+    input_path = os.path.join(base_dir, '../data/raw/sih_sp_2025.csv')
+    output_path = os.path.join(base_dir, '../data/processed/sih_sp_2025_processado.csv')
 
     colunas_sih_significativas = {
         'UF_ZI': 'Unidade_Federativa', 'ANO_CMPT': 'Ano_Competencia',
@@ -42,36 +21,37 @@ def processar_sih():
         'RACA_COR': 'Raca_Cor', 'CNES': 'Codigo_CNES_Hospital'
     }
 
-    print("Renomeando cabeçalhos do DataSUS...")
-    df.rename(columns=colunas_sih_significativas, inplace=True)
-
-    # OTIMIZAÇÃO: Isola apenas os CEPs únicos para evitar milhares de consultas repetidas
-    print("Identificando CEPs únicos...")
-    ceps_unicos = df['CEP_Paciente'].dropna().unique()
-    print(f"Total de {len(ceps_unicos)} CEPs únicos para consultar. Iniciando API...")
-    
-    cache_ceps = {}
-    
-    for i, cep in enumerate(ceps_unicos):
-        if i > 0 and i % 50 == 0:
-            print(f"Progresso: {i} de {len(ceps_unicos)} CEPs consultados...")
-            
-        # Limpeza do CEP
-        cep_limpo = str(cep).replace(".0", "").replace("-", "").strip().zfill(8)
-        
-        # Consulta e salva no dicionário
-        cache_ceps[cep] = buscar_bairro_unico(cep_limpo)
-        
-        # Pausa fundamental para não ser bloqueado pelo ViaCEP
-        time.sleep(0.3)
-
-    print("Mapeando os bairros de volta para a base completa...")
-    df['Bairro_Paciente'] = df['CEP_Paciente'].map(cache_ceps)
-
+    colunas_necessarias = list(colunas_sih_significativas.keys())
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    df.to_csv(output_path, sep=';', index=False, encoding='utf-8')
     
-    print(f"Sucesso! Arquivo gerado em: {output_path}")
+    # Se já existir um arquivo antigo processado, remove para recomeçar limpo
+    if os.path.exists(output_path):
+        os.remove(output_path)
+
+    print("Lendo e processando o arquivo em blocos de 100 mil linhas...")
+    tamanho_lote = 100000
+    primeiro_lote = True
+    total_linhas = 0
+
+    # O chunksize lê o arquivo gigante em pedaços pequenos, poupando a RAM
+    for chunk in pd.read_csv(input_path, sep=',', dtype={'CEP': str, 'MUNIC_RES': str}, usecols=colunas_necessarias, low_memory=False, chunksize=tamanho_lote):
+        
+        chunk.rename(columns=colunas_sih_significativas, inplace=True)
+        chunk['Codigo_Municipio_Residencia'] = chunk['Codigo_Municipio_Residencia'].astype(str).str[:6]
+
+        cids_saneamento = ('A0', 'A27', 'B65', 'A90', 'A91')
+        chunk['Grupo_Saneamento'] = chunk['Diagnostico_Principal_CID'].astype(str).str.startswith(cids_saneamento, na=False)
+        chunk['Grupo_Saneamento'] = chunk['Grupo_Saneamento'].map({True: 'Relacionada ao Saneamento', False: 'Outras Causas'})
+
+        # Salva incrementalmente no arquivo final
+        chunk.to_csv(output_path, sep=';', index=False, encoding='utf-8', mode='w' if primeiro_lote else 'a', header=primeiro_lote)
+        
+        total_linhas += len(chunk)
+        primeiro_lote = False
+        print(f"   -> Processados e salvos: {total_linhas} registros...")
+
+    print(f"✅ Sucesso! Base estadual processada com {total_linhas} registros.")
+    print(f"📁 Arquivo salvo em: {output_path}")
 
 if __name__ == "__main__":
-    processar_sih()
+    processar_sih_por_partes()
