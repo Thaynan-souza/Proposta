@@ -24,7 +24,6 @@ def processar_sih_por_partes():
     colunas_necessarias = list(colunas_sih_significativas.keys())
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
-    # Se já existir um arquivo antigo processado, remove para recomeçar limpo
     if os.path.exists(output_path):
         os.remove(output_path)
 
@@ -33,7 +32,6 @@ def processar_sih_por_partes():
     primeiro_lote = True
     total_linhas = 0
 
-    # O chunksize lê o arquivo gigante em pedaços pequenos, poupando a RAM
     for chunk in pd.read_csv(input_path, sep=',', dtype={'CEP': str, 'MUNIC_RES': str}, usecols=colunas_necessarias, low_memory=False, chunksize=tamanho_lote):
         
         chunk.rename(columns=colunas_sih_significativas, inplace=True)
@@ -43,7 +41,6 @@ def processar_sih_por_partes():
         chunk['Grupo_Saneamento'] = chunk['Diagnostico_Principal_CID'].astype(str).str.startswith(cids_saneamento, na=False)
         chunk['Grupo_Saneamento'] = chunk['Grupo_Saneamento'].map({True: 'Relacionada ao Saneamento', False: 'Outras Causas'})
 
-        # Salva incrementalmente no arquivo final
         chunk.to_csv(output_path, sep=';', index=False, encoding='utf-8', mode='w' if primeiro_lote else 'a', header=primeiro_lote)
         
         total_linhas += len(chunk)

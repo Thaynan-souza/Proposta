@@ -32,7 +32,6 @@ def baixar_dados_sih_sp(ano: int, estado: str = "SP"):
             pyreaddbc.dbc2dbf(caminho_local_dbc, caminho_local_dbf)
             table = DBF(caminho_local_dbf, encoding='iso-8859-1')
             
-            # Lendo em lotes (chunks) de 50 mil registros para poupar a RAM do Codespaces
             lote = []
             registros_mes = 0
             escrever_cabecalho = (total_registros == 0)
@@ -45,9 +44,8 @@ def baixar_dados_sih_sp(ano: int, estado: str = "SP"):
                     escrever_cabecalho = False
                     registros_mes += len(df_lote)
                     total_registros += len(df_lote)
-                    lote = [] # Limpa a lista do lote da memória
+                    lote = [] 
 
-            # Salva o restante que sobrou (menos de 50 mil)
             if lote:
                 df_lote = pd.DataFrame(lote)
                 df_lote.to_csv(arquivo_csv, mode='a', index=False, encoding='utf-8', header=escrever_cabecalho)

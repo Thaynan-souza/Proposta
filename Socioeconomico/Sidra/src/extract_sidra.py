@@ -33,7 +33,6 @@ def extrair_e_salvar_tabelas():
             registros = []
             
             for serie in dados:
-                # Agora salvamos o nome da variável (ex: "População residente" ou "Densidade demográfica")
                 nome_variavel = serie.get('variavel', 'Valor') 
                 
                 resultados = serie.get('resultados', [])

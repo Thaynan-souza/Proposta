@@ -1,60 +1,60 @@
-# 📊 TCC - Inteligência de Dados na Gestão Pública de Saúde (Campinas/SP)
+# Análise Socioeconômica e de Saúde (TCC)
 
-Projeto acadêmico focado no desenvolvimento de um pipeline de dados (ETL) para extração, tratamento e análise espacial de microdados públicos. O objetivo é integrar indicadores de saúde (DATASUS) e de vulnerabilidade social (CadÚnico/IBGE) para mapear padrões territoriais no município de Campinas, auxiliando a tomada de decisão na gestão pública.
-
----
-
-## 🏗️ Arquitetura do Projeto
-
-O repositório está organizado de forma modular para separar os processos de extração, tratamento e análise espacial:
-
-```text
-tcc-datasus/
-├── SIM/                   # 📁 Módulo de Mortalidade (Óbitos)
-│   ├── data/              # 📁 Dados brutos e processados do SIM
-│   ├── notebooks/         # 📓 Análises exploratórias de mortalidade (Ano, Sexo, Idade, Raça)
-│   └── src/               # 💻 Scripts de ETL do SIM
-├── SIH/                   # 📁 Módulo de Internações Hospitalares
-│   ├── data/              # 📁 Dados brutos e processados do SIH
-│   ├── notebooks/         # 📓 Análises de internações, CEPs e causas (CID-10)
-│   └── src/               # 💻 Scripts de extração do SIH
-├── .gitignore             # 🚫 Regras para ignorar arquivos pesados (CSV/DBC)
-├── requirements.txt       # 📦 Dependências do projeto (Bibliotecas Python)
-└── README.md              # 📖 Documentação do projeto
-
-🚀 Status Atual do Desenvolvimento
-1️⃣ Fase de Extração (Extract) — Concluída
-SIM (Mortalidade): Coleta automatizada via FTP dos últimos 5 anos de óbitos em Campinas (2020–2024), com preservação de todas as 87 colunas originais do DATASUS.
-
-SIH (Internações): Pipeline mensal implementado para extração de microdados de internação (RD), filtrando de forma otimizada (linha por linha) apenas os registros de moradores de Campinas (código IBGE 350950).
-
-2️⃣ Fase de Análise Exploratória (EDA) — Em Andamento
-Mortalidade: Cruzamentos populacionais por Ano, Faixa Etária, Sexo e Raça/Cor das principais causas de óbito (com destaque para o impacto da COVID-19, infartos e Alzheimer).
-
-Internações: Validação do preenchimento de CEPs (100% de cobertura na base de 2023) e mapeamento preliminar por regiões e causas principais de internação hospitalar via CID-10.
-
-💻 Como Executar o Projeto
-Certifique-se de estar com o ambiente virtual ativado e as dependências instaladas:
-
-Bash
-# Ativa o ambiente virtual
-source .venv/bin/activate
-
-# Instala as bibliotecas necessárias
-pip install -r requirements.txt
-Para rodar a extração dos dados brutos do DATASUS:
-
-Bash
-# Extração do SIM (Óbitos)
-cd SIM/src && python extract.py
-
-# Extração do SIH (Internações)
-cd SIH/src && python extract.py
+Este repositório contém o pipeline de dados desenvolvido para o Trabalho de Conclusão de Curso (TCC). O objetivo do projeto é extrair, processar e cruzar dados de internações hospitalares (DATASUS) com indicadores demográficos e de saneamento básico (IBGE/SIDRA) para o Estado de São Paulo.
 
 ---
 
-Após colar e salvar o arquivo, basta fazer o último commit e push rápido para atualizar a página principal do GitHub:
-```bash
-git add README.md
-git commit -m "docs: atualiza o README com a estrutura do SIH e status atual"
-git push
+## 📚 O que são as Bases de Dados Utilizadas?
+
+Para garantir a fundamentação da análise, o projeto integra dados de três grandes sistemas de informações públicas do Brasil:
+
+**1. Censo Demográfico (IBGE)**
+A pesquisa mais ampla sobre a população brasileira. Utilizamos os dados agregados por **Setores Censitários** (a menor divisão territorial mapeada pelo IBGE) para identificar com alta precisão características domiciliares e de renda em nível de bairro. Isso permite classificar regiões (Sede vs. Periferia) e mapear a desigualdade intraurbana detalhadamente.
+
+**2. SIDRA - Sistema IBGE de Recuperação Automática**
+É o banco de dados oficial do IBGE que centraliza e disponibiliza tabelas consolidadas de diversas pesquisas. Neste projeto, extraímos indicadores em nível **Municipal** para todo o Estado de São Paulo, focando nas infraestruturas que impactam a saúde:
+* **Tabela 4714**: População residente e estimativas demográficas.
+* **Tabela 6803**: Proporção de domicílios com abastecimento de água adequado.
+* **Tabela 6805**: Proporção de domicílios com esgotamento sanitário (rede geral).
+* **Tabela 10295**: Indicadores de rendimento e características domiciliares.
+
+**3. SIH/DATASUS - Sistema de Informações Hospitalares**
+É o sistema do Ministério da Saúde responsável por registrar todas as internações financiadas pelo Sistema Único de Saúde (SUS) por meio da emissão da AIH (Autorização de Internação Hospitalar).
+* **O que utilizamos:** Os arquivos massivos de microdados de internações do Estado de São Paulo (2025).
+* **O que eles indicam:** Permitem analisar os motivos da internação (diagnósticos), custos, tempo de permanência e o desfecho do paciente — especialmente a coluna de **Óbito (MORTE)** —, permitindo cruzar a morbidade e mortalidade hospitalar com a precariedade sanitária apontada pelo IBGE.
+
+---
+
+## 📂 Estrutura do Projeto
+
+O repositório foi modularizado em dois grandes blocos de análise:
+- **`Socioeconomico/Sidra/`**: Dedicado à extração e tratamento dos dados demográficos e de infraestrutura do IBGE.
+- **`tcc-datasus/SIH/`**: Focado no processamento das bases massivas de morbidade hospitalar do SUS.
+
+*Nota: As pastas `data/raw/` e `data/processed/` são ignoradas no versionamento do Git devido ao limite de tamanho de arquivos (Large File Storage), garantindo que apenas os códigos-fonte sejam versionados.*
+
+---
+
+## ⚙️ Códigos de Extração e Transformação (ETL)
+
+### Módulo Socioeconômico (IBGE/SIDRA)
+* **`extract_sidra.py`**: Conecta-se à API ou fontes do IBGE para realizar o download automatizado das tabelas dos agregados (População, Água, Esgoto e Renda) e salva os arquivos brutos.
+* **`transform_sidra.py`**: Realiza a limpeza dos dados brutos do estado de São Paulo. Ele padroniza os cabeçalhos para o formato `snake_case`, remove sufixos desnecessários (como " - SP" dos nomes dos municípios) e exporta planilhas unificadas e prontas para cruzamento.
+
+### Módulo Saúde (DATASUS/SIH)
+* **`extract.py`**: Conecta-se ao FTP do DATASUS e realiza o download dos arquivos brutos mensais (em formato `.dbc`) de São Paulo, convertendo-os estruturalmente para iniciar o processamento.
+* **`transform.py`**: Desenvolvido para lidar com grandes volumes de dados (Big Data). Ele lê as bases estaduais do SIH em lotes (*chunks*), otimizando o uso de memória, aplica filtros de limpeza e consolida as internações em um arquivo CSV processado final.
+
+---
+
+## 🚀 Como Executar
+
+1. Crie o ambiente virtual e instale as dependências:
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
+
+2. Execute os scripts de extração nas pastas src/ para baixar os dados para a pasta data/raw/.
+
+3. Execute os scripts de transformação para gerar os dados limpos na pasta data/processed/.
